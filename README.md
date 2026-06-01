@@ -576,9 +576,9 @@ class constructors:
 
 C#
 ```C#
-public GPIBDevice\_NINET(string name, string addr)
+public GPIBDevice_NINET(string name, string addr)
 
-public GPIBDevice\_NINET(string name, string addr, int buffersize)
+public GPIBDevice_NINET(string name, string addr, int buffersize)
 ```
 VB 
 ```vb
@@ -607,7 +607,7 @@ In early releases I noticed that the Notify feature was sometimes not working p
 To enable setting SRQ when the MAV bit is set you need to enable the appropriate bit in the Service Request Enable Register of your instrument. Usually it is the bit 4 and it will be set sending the command "\*SRE 16" to the device (note that you can also add other flags to wakeup on, eg. OPC,  error etc.). There is an example of function doing all these configuration steps in the demo project:
 
 ```C#
-public void setnotify(GPIBDevice\_NINET dev)
+public void setnotify(GPIBDevice_NINET dev)
 
   {
 
@@ -627,6 +627,15 @@ uses the Windows dll library "_gpib488.dll_" provided with Measurement&Computin
 
 The constructor parameters are the same as for GPIBDevice_NINET.
 
+The Notify feature is not available in this library therefore EnableNotify is not implemented here.
+
+The class adds a property:
+```C#
+public int IOTimeoutCode
+```
+which sets/gets the interface timeout for the device (codes defined in the DLL manual are reported in the class as constants).
+
+
 #### class GPIBDevice_ADLink
 
 uses the Windows dll  "_gpib-32.dll_" provided with ADLink boards. Was intensively tested with the USB-GPIB3488A board from ADLink (running 24/7 for months).
@@ -635,7 +644,16 @@ NB. this dll has the same name as the one installed by NI software or older MC
 
 The constructor parameters are the same as for GPIBDevice\_NINET.
 
-Note: In the first version the class was using the driver calls provided in the ADLink library import module for C#. These are not all compatible with the "standard" calls found in other "gpib-32" dlls, however all standard routines exist there as can be found using a dll browser.  In this version only standard calls are used.  Therefore this class should also be compatible with NI drivers  (so the class could rather be called "GPIBDevice\_gpib-32" but I did not want to change the name). Note however that error messages are less complete here than those returned by GPIBDevice_NINET. The code of this class is almost identical to the one of GPIBDevice_gpib488  except for some tiny differences in the driver functions signatures.  
+The class adds a property `IOTimeoutCode` working like the one of GPIBDevice_gpib488.
+
+The class implements the property `EnableNotify`. It has been implemented in a way similar to GPIBDevice_NINET: only the board callback is used and autopolling is disabled, the class maintaining a list of subscribers to the Notify service (see description of GPIBDevice_NINET for more details).
+
+In the first version the class was using the driver calls provided in the ADLink library import module for C#. These are not all compatible with the "standard" calls found in other "gpib-32" dlls, however all standard routines exist there as can be found using a dll browser.  In the current version only standard calls are used.  Therefore this class should also be compatible with NI drivers  (so the class could rather be called "GPIBDevice\_gpib-32" but I did not want to change the name). (Note however that error messages are less complete here than those returned by GPIBDevice_NINET.) The code of this class is almost identical to the one of GPIBDevice_gpib488  except for some tiny differences in the driver functions signatures.  
+
+Note for ADLink board users:
+
+The C# interface class provided by ADLink has a bug (that I had initially reproduced in both C# and VB versions) resulting from an incorrect transcription of the original C header specifying the DLL functions signatures (the type "long" is usually an Int32 in C, but in C# "long" means Int64). Luckily, this bug was not harmful for the data passed to the DLL and it could even go unnoticed in NET Framework ver. 3.5 (VS2008) because the interop marshaller fixes the stack (https://msdn.microsoft.com/en-us/library/ff361650(v=VS.100).aspx), however under NET 4.0 and higher (VS2010 and later), the default marshaller is more strict and the bug would trigger a 'PInvokeStackImbalance' error.  I have corrected the bug since and the present version works correctly under recent NET versions.
+
 
 #### class VisaDevice
 
@@ -643,7 +661,8 @@ Uses Windows dll “_Visa32.dll_”. It is provided in both 32bit and 64bit ver
 
 NB. In 32bit Windows dlls are in Windows/system32 but in 64bit Windows, 32bit dlls are in Windows/SysWow64 and 64bit dlls are in Windows/system32.
 
-National Instruments' Visa library (that may be downloaded from NI website) provides a generic interface that can be used to access various physical interfaces (Gpib, serial, USB, TCP/IP etc.). Visa implements various protocols developed for instrumentation like  USBTMC (over USB),  VXI-11 and HiSLIP (over TCP/IP).  These protocols mimic the behavior of GPIB in many aspects as they were intended to replace it. We find there the equivalents of polling the status register, out-of-band signalling for service request messages etc.   The VXI-11 and HiSLIP protocols are part of the LXI standard (Lan eXtension for Instrumentation, which defines protocols for controlling instruments via TCP/IP). 
+National Instruments' Visa library provides a generic interface that can be used to access various physical interfaces (Gpib, serial, USB, TCP/IP, etc.). There is an equivalent library by Keysight (formerly Agilent), in principle, both NI and Keysight versions are binary compatible (both may be downloaded from their respective websites). 
+Visa implements various protocols developed for instrumentation like  USBTMC (over USB),  VXI-11 and HiSLIP (over TCP/IP).  These protocols mimic the behavior of GPIB in many aspects as they were intended to replace it. We find there the equivalents of polling the status register, out-of-band signalling for service request messages etc.   The VXI-11 and HiSLIP protocols are part of the LXI standard (Lan eXtension for Instrumentation, which defines protocols for controlling instruments via TCP/IP). 
 
 In principle the basic read/write functions are the same for all interfaces handled by Visa however each of them may need a specific configuration (options – called “attributes” in Visa, error handling etc.). The `VisaDevice` class provides a basic Visa configuration, you may need to create derived classes to tweak it for a specific configuration. It was successfully tested with GPIB (using GPIB-USB-HS+ board from NI),  USB and TCP/IP.  For GPIB, a small advantage of VisaDevice over the GPIBDevice\_NINET class is that it does not require any external assemblies from NI (the needed version of these may depend on the compiler, .NET version etc.).
 
@@ -667,16 +686,35 @@ for USB:    USB\[board\]::manufacturer ID::model code::serial number::INSTR
 
 for TCPIP:  TCPIP\[board\]::IP address\[::LAN device name\]::INSTR
 
-This class also adds a method to set Visa attributes:
 
-C#  
+This class also adds methods to set and get Visa attributes (here limited to most common attribute types: int, uint) as well as a property to get/set the interface timeout for the device:
+
+C#
 ```C#
-public uint SetAttribute(int attribute, int attrState)
+public uint SetAttribute(uint attribute, int attrState)
+public uint SetAttribute(uint attribute, uint attrState)
+
+public uint GetAttribute(uint attribute, out int attrState)
+public uint GetAttribute(uint attribute, out uint attrState)
+
+public int IOTimeout  //timeout in ms
 ```
-VB 
+
+VB.NET
 ```vb
-Public Function SetAttribute(ByVal attribute As Integer, ByVal attrState As Integer) As UInteger
+Public Function SetAttribute(ByVal attribute As UInteger, _
+                            ByVal attrState As Integer) As UInteger
+Public Function SetAttribute(ByVal attribute As UInteger, _
+                            ByVal attrState As UInteger) As UInteger
+
+Public Function GetAttribute(ByVal attribute As UInteger, _
+                            ByRef attrState As Integer) As UInteger
+Public Function GetAttribute(ByVal attribute As UInteger, _
+                            ByRef attrState As UInteger) As UInteger
+
+Public Property IOTimeout() As UInteger 
 ```
+
 #### class SerialDevice
 
 Although Visa can be used to access serial ports it was simple (also more useful and efficient since it does not need Visa resources) to write an implementation using the standard SerialPort class provided in NET.
