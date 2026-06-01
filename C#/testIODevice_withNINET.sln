@@ -1,0 +1,27 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+# SharpDevelop 4.4
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IODevices_withNINET", "IODevices\IODevices_withNINET.csproj", "{7B06EDFC-156B-4356-9410-389DC49859B5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "testIODevice_withNINET", "testIODevice\testIODevice_withNINET.csproj", "{C253372A-C312-4060-8E0D-346831C41BF1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7B06EDFC-156B-4356-9410-389DC49859B5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7B06EDFC-156B-4356-9410-389DC49859B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7B06EDFC-156B-4356-9410-389DC49859B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7B06EDFC-156B-4356-9410-389DC49859B5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C253372A-C312-4060-8E0D-346831C41BF1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C253372A-C312-4060-8E0D-346831C41BF1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C253372A-C312-4060-8E0D-346831C41BF1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C253372A-C312-4060-8E0D-346831C41BF1}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
