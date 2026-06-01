@@ -11,8 +11,8 @@ Synchronous/asynchronous control via multiple interfaces with command queuing
 Introduction
 ------------
 
-This code and article have first been published in 2017 on the CodeProject website 
-(https://www.codeproject.com/Articles/1166996/Multithreaded-communication-for-GPIB-Visa-Serial-i, the last revision published there was from May 2018).  Since the recent, apparently permanent, shutdown of the site I moved everything here. 
+This code and article have been first published in 2017 on the CodeProject website 
+(https://www.codeproject.com/Articles/1166996/Multithreaded-communication-for-GPIB-Visa-Serial-i), the last revision published there was from May 2018.  Since the recent, apparently permanent, shutdown of the site I moved everything here. 
 The licensing is derived from the original CPOL license: all the code is published under the open MIT license,
  however the author retains the copyright of the present article: you may not publish it elsewhere without permission by the author.
 
