@@ -568,7 +568,7 @@ For all GPIB classes, if `buffersize` is not specified it will be set to 32k.
 
 Below is the list of the implementations provided here. 
 
-#### class GPIBDevice\_NINET
+#### class GPIBDevice_NINET
 
 uses the native .NET library for NI Gpib , uses as reference the following .NET assemblies from NI: `NationalInstrumentsCommon`, `NationalInstruments.NI4882` (these are installed with the NI GPIB driver). The class was intensively tested with the GPIB-USB-HS+ board from NI (running 24/7 for months). The assembly will not compile if these files are not found (and were not included here because of copyright), therefore a version of the project where this class is not included is also provided. Note that in many cases we won't necessary need this library: usually the NI software for GPIB will also install Visa. Also, in the 32bit environment the ADLink implementation is in principle compatible with the dll provided by NI (see later).
 
@@ -640,9 +640,9 @@ which sets/gets the interface timeout for the device (codes defined in the DLL m
 
 uses the Windows dll  "_gpib-32.dll_" provided with ADLink boards. Was intensively tested with the USB-GPIB3488A board from ADLink (running 24/7 for months).
 
-NB. this dll has the same name as the one installed by NI software or older MCC software. It may be wiser to rename this dll before installing it in the Windows directory (Windows/SysWow64 on 64 bit systems) and then change the string constant “\_GPIBDll” in the code.
+NB. this dll has the same name as the one installed by NI software or older MCC software. It may be wiser to rename this dll before installing it in the Windows directory (Windows/SysWow64 on 64 bit systems) and then change the string constant “_GPIBDll” in the code.
 
-The constructor parameters are the same as for GPIBDevice\_NINET.
+The constructor parameters are the same as for GPIBDevice_NINET.
 
 The class adds a property `IOTimeoutCode` working like the one of GPIBDevice_gpib488.
 
@@ -657,7 +657,7 @@ The C# interface class provided by ADLink has a bug (that I had initially reprod
 
 #### class VisaDevice
 
-Uses Windows dll “_Visa32.dll_”. It is provided in both 32bit and 64bit versions (with the same name, to force using the 64 bit version “_Visa64.dll_” you may change the constant “\_VisaDll” in the code).
+Uses Windows dll “_Visa32.dll_”. It is provided in both 32bit and 64bit versions (with the same name, to force using the 64 bit version “_Visa64.dll_” you may change the constant “_VisaDll” in the code).
 
 NB. In 32bit Windows dlls are in Windows/system32 but in 64bit Windows, 32bit dlls are in Windows/SysWow64 and 64bit dlls are in Windows/system32.
 
@@ -672,7 +672,7 @@ The "Notify" feature is implemented in this class.  The class' property `Enab
 
 *    NINET allows to create a device even if it is not connected to the system while in Visa this will cause an error (actually the error occurs when trying to clear the device on startup, this may be disabled in the code setting the constant `clearonstartup` in `VisaDevice` to false)
 *   in VisaDevice only a few common errors give full-text messages, for other errors only the hexadecimal error code is reported (I was just too lazy to code all possible messages)
-*   Visa only provides device-level callbacks, for NI GPIB these rely on "autopolling", therefore for some hardware configuration `EnableNotify` may encounter problems that I previously had with  `GPIBDevice``_NINET` (see the GPIBDevice\_NINET class description above).
+*   Visa only provides device-level callbacks, for NI GPIB these rely on "autopolling", therefore for some hardware configuration `EnableNotify` may encounter problems that I previously had with  `GPIBDevice_NINET` (see the GPIBDevice_NINET class description above).
 
 For USB, the device has to be compatible with the "Test and Measurement Class" (USB-TMC) protocol. When after connecting it the device is detected as a "Test and Measurement Device" then it can be used immediately. If the driver is not present then see [http://www.ni.com/tutorial/4478/en/](http://www.ni.com/tutorial/4478/en/) for instructions to create one.
 
@@ -702,15 +702,11 @@ public int IOTimeout  //timeout in ms
 
 VB.NET
 ```vb
-Public Function SetAttribute(ByVal attribute As UInteger, _
-                            ByVal attrState As Integer) As UInteger
-Public Function SetAttribute(ByVal attribute As UInteger, _
-                            ByVal attrState As UInteger) As UInteger
+Public Function SetAttribute(ByVal attribute As UInteger, ByVal attrState As Integer) As UInteger
+Public Function SetAttribute(ByVal attribute As UInteger,  ByVal attrState As UInteger) As UInteger
 
-Public Function GetAttribute(ByVal attribute As UInteger, _
-                            ByRef attrState As Integer) As UInteger
-Public Function GetAttribute(ByVal attribute As UInteger, _
-                            ByRef attrState As UInteger) As UInteger
+Public Function GetAttribute(ByVal attribute As UInteger,  ByRef attrState As Integer) As UInteger
+Public Function GetAttribute(ByVal attribute As UInteger, ByRef attrState As UInteger) As UInteger
 
 Public Property IOTimeout() As UInteger 
 ```
@@ -756,6 +752,10 @@ Like for the classes `GPIBDevice_NINET` and `VisaDevice`, the current version
 
 Note that unlike protocols like GPIB, USBTMC or LXI which are defined to make things uniform, the serial port does not have any standard protocol for messages therefore it is not possible to make a plug-and-play class (like Visa) working for all serial connections.  The `SerialDevice` class implements a simple line-oriented protocol: each message terminates with the same special end-of-line character and there is one response message for each query. However if your device uses something different  -  such as either fixed length messages with no termination or some weird syntax where both terminated and fixed-length messages are mixed or where responses can use different termination characters depending on command - then it will be necessary to make a derived class overriding the method `ReadByteArray`.  In case this method needs to know what the command sent was to determine how to format the response, I have added a property `currentactivequery` which may be used to access this information.
 
+I have tested the class with a Prolific USB-serial converter (with four com ports).
+If you have problems when using more than one port at the same time, then it might have something to do with the virtual port driver and threading, read "query sequence and lock levels" in the last section.
+
+
 ## Writing implementations
 
 It is easy to create derived classes to create new implementations or to tweak existing implementations for a specific configuration. There are four abstract methods to define (override):
@@ -772,6 +772,7 @@ protected abstract int ReceiveByteArray(ref byte\[\] arr, ref bool EOI, ref int 
 
 protected abstract void DisposeDevice();
 ```
+
 VB
 ```vb
 Protected MustOverride Function ClearDevice(ByRef errcode As Integer, ByRef errmsg As String) As Integer
@@ -787,6 +788,7 @@ Protected MustOverride Sub DisposeDevice()
 See explanations in the code of the class `IODevice`  under the comment "interface abstract methods that have to be defined" for the meaning of parameters and return values.
 
 Example: if your device does not comply with the 488.2 standard on the meaning of th status byte bits, you may need to re-interpret this byte to get the "message available" status, something like this:
+
 ```C#
 protected override int PollMAV(ref bool mav, ref byte statusbyte, ref int errcode, ref string errmsg){
 
