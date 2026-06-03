@@ -834,7 +834,29 @@ In order for the bus locking to be flexible, the respective lock object is selec
 ```C#
 protected int interfacelockid;
 ```
-This variable has to be set by the child class constructor. The idea is that if two different interfaces that the can be used concurently are present they will use different lock objects so that locking will not degrade performance. In this code `interfacelockid` is set to 0 for NI-NET/NIVisa, 1 for ADLink and 2 for gpib488. If `interfacelockid` is set to a negative value then no bus locking is performed. This is the case for the serial port implementation (there is no common bus or common driver and the "SerialPort" .NET class is thread-safe).
+This variable has to be set by the child class constructor and the allowed values of the index are 0..99. If `interfacelockid` is set to a negative value then no interface locking is performed.
+The idea here is that if we have two different interfaces that can be used concurently they can use different lock objects so that locking will not degrade performance.
+
+For gpib, if there is only one board, then interface locking will not slow down the system since all devices share the same bus anyway (and can bring the benefit of a more responsive GUI in blocking calls as explained above). However, if there are several boards accessed by the same driver then if the driver is thread-safe, it is better to allow different boards to be accessed simultaneously from different threads, this is achieved setting different interfacelockid values for each board. If a driver is not thread-safe, then we have to use the same interfacelockid for all boards/devices using this driver.
+
+For USB and TCP/IP via Visa and for the serial port, the situation is a bit different since there is no common bus, here sharing the same lock for several devices may slow down the data transfer. Visa is thread-safe therefore it is safe to access the driver without locks. The SerialPort class instance members are not quite thread-safe but since in this code, we never have two threads talking to the same COM port at the same time the serial interface locking can be disabled too. One caveat though: it has been reported that some USB-serial converter dongles have buggy virtual com port drivers (https://lavag.org/topic/18562-visa-write-read-to-usb-instruments-in-parallel-crashes-labview/), if problems arise, it may be necessary to define a common `interfacelockid` value for all devices talking to the same virtual com port driver (NB. I have tested the SerialDevice class with several devices attached via a Prolific USB-serial converter, with interface locking disabled, so far I did not detect any problems).
+
+In this code, the default settings for `interfacelockid` follow this general philosophy:
+
+* GPIBDevice_NINET :  interfacelockid=board number (assumed thread-safe)
+    
+* GPIB via VisaDevice : interfacelockid=10+board number (assumed thread-safe, I supposed here that the same GPIB board will not be accessed via both Visa and NINET classes in the same application, otherwise it is better to set it to the same value as NINET)
+
+* GPIBDevice_ADLink: interfacelockid=20 (assumed not thread-safe)
+     
+* GPIBDevice_gpib488: interfacelockid=21 (assumed not thread-safe)
+     
+* USB and TCP/IP via VisaDevice: interfacelockid=-1 (assumed thread-safe)
+     
+* SerialDevice: interfacelockid=-1 (assumed thread-safe)
+  
+Of course, these settings can be easy modified in the respective class constructors.
+
 
 #### Query Sequence
  
