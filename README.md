@@ -166,6 +166,17 @@ quoted from: http://www.ni.com/tutorial/4054/en/ :
 >   
 > ANSI/IEEE Standard 488.2-1987 solves this problem by defining certain service request conditions so that one model describes the Status Byte for all compliant devices. Bit 6, the device Request Service (RQS) bit, maintains the IEEE 488.1 definition. If Bit 6 is set, then the device requested service. The IEEE 488.2 standard defines Bits 4 and 5; instrument manufacturers define the remaining bits (0 through 3 and 7). Bit 4 is the Message Available (MAV) bit. This bit is set if the device has been previously queried for data and the device has a pending data message to send.
 
+First note that this explanation is misleading.  Polling and SRQ are two distinct features that can be used together but don’t have to. 
+
+> Serial polling is a method of obtaining specific information from GPIB devices when they request service.
+ 
+Here polling is used to get the MAV bit whether SRQ is being used or not. 
+
+> When you conduct a serial poll, the Controller queries each device looking for the one that asserted SRQ.
+ 
+This is only true if you use the “autopolling” configuration (default setting for GPIB boards).  The problem with autopolling is that when an older device that does not support the standard SRQ-poll protocol is on the bus the autopoller can stuck. Whenever possible I disabled autopolling and determine the source by my own way using board-level callbacks (see description of GPIBDevice_NINET and GPIBDevice_ADLink).  This was not possible in Visa therefore for some configurations handling SRQ may cause problems.    For more details on the use of SRQ see next section.
+
+
 The polling option is enabled setting "enablepoll" field to true (default). It should be enabled if the device is compatible with the 488.2 standard. Then the serial poll is used to see if a device is ready to send data by examining its Status Byte, in this way the gpib bus is not locked most of the time when waiting for a device to respond. This is especially important when the query command also acts as a software trigger of a new measurement (standard behavior for DMMs).
 
 This library only uses the MAV (Message Available) bit of the status byte defined in the standard as explained above.
