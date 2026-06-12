@@ -179,7 +179,7 @@ This is only true if you use the “autopolling” configuration (default settin
 
 The polling option is enabled setting "enablepoll" field to true (default). It should be enabled if the device is compatible with the 488.2 standard. Then the serial poll is used to see if a device is ready to send data by examining its Status Byte, in this way the gpib bus is not locked most of the time when waiting for a device to respond. This is especially important when the query command also acts as a software trigger of a new measurement (standard behavior for DMMs).
 
-This library only uses the MAV (Message Available) bit of the status byte defined in the standard as explained above.
+This library only uses the MAV (Message Available) bit of the status byte defined in the standard as explained above. The position of the bit can be modified using the class parameter `MAVmask`.
 
 Most devices comply to 488.2, but not all eg. some Lakeshore temperature controllers define their own meaning for all the status byte bits. If you see a "poll timeout" error appearing then it is probably the case and polling should be disabled. Alternatively, it is possible to write a derived class overriding the virtual method “`pollMAV`” : this method also returns the whole status byte so that it is easy to write a modified implementation where the status byte is interpreted differently (see example in the section about implementations).  If polling is not available then, as said above, we should set a short timeout at the interface level (the reading will anyway be repeated automatically on timeout) so to not to block the bus for long periods of time.
 
@@ -221,9 +221,22 @@ Each device has its own queue and runs its own dedicated thread processing queri
 
 The idea of using both types of queries is that often the mainstream sequence (eg. needing complex sequence for device configuration, arming, acquiring etc., where the commands to sent may sometimes depend on the data received so it is simpler and natural to use synchronous calls) runs in parallel with some annex tasks repeated at constant intervals to update the status of the experiment (e.g. reading temperature every second). For these tasks we usually use timers, and such tasks are much more efficient with asynchronous queries, using available bus bandwidth and time slots.
 
+Even without timers, there is a benefit in using the asynchronous commands to initiate simultaneous queries. Then the method, "WaitAsync" can be used for synchronization between the asynchronous command queue and the main thread: this method waits until queries initiated before the call are completed (N.B. not until the queue is empty - this may never happen if other asynchronous queries are also issued in timers). For example:
+
+```
+device1.QueryAsync(...);
+device2.QueryAsync(...);
+device1.WaitAsync();
+device2.WaitAsync();
+```
+As explained in the introduction, this sequence will in general perform better than an equivalent sequence of two blocking queries.
+
+It is perfectly legal to call another asynchronous query from within a callback function. This offers a possibility to chain asynchronous operations (and a circular chain will generate a loop of asynchronous operations). Suppose you need to implement a sequence where after device 1 is queried, its query result is used to select/format another query on device 2. This whole sequence can be implemented asynchronously if the query on the second device will be called from the callback function handling the query of device 1. Such an approach based on chaining asynchronous tasks via callbacks bears some resemblance to the way Labview works: in Labview, the program flow control (scheduling of different tasks such as reading instruments and processing) is entirely based on the data flow e.g., a data received from an instrument is used as an event trigger for the next node of the code diagram.
+
+
 One can mix blocking and asynchronous commands even on the same device, then a blocking command should in principle be processed as soon as the current asynchronous operation (if any) completes or when it is waiting for retry (however there is no guarantee as for the exact timing which is decided by the OS task scheduler).
 
-The method `WaitAsync` can be used for synchronization between the asynchronous command queue and the main thread (see class description below): this method waits until queries initiated before the call are completed (NB. not until the queue is empty - this may never happen if asynchronous queries are issued in timers).
+
 
 #### Common arguments:
 
@@ -286,9 +299,11 @@ Public Delegate Sub IOCallback(ByVal q As IOQuery)
 
 Here the variable `q` will contain the status and data relative to the operation, the rules are the same as for the blocking calls i.e. the data fields are null references if an error occurred.
 
+
+
 Note that, even though the callback is initiated from a different thread, the callback function will be executed on the main (GUI) thread (this is to allow updating GUI components within the callback function), in other words the asynchronous thread sends a message to the main thread to call the function. Therefore the callback function will not be called until processing messages by the GUI thread is allowed.
 
-The return value for all versions of `SendAsync` and `QueryAsync` methods is: 0 if ok, -1 if the queue is full (for each device the maximum queue length is defined by the field `maxtasks`, default is 50), -2 if device is disposing.
+
 
 ##### SendAsync
 
@@ -308,6 +323,8 @@ Public Function SendAsync(ByVal cmd As String, ByVal retry As Boolean)
 
 Public Function SendAsync(ByVal cmd As String, ByVal callback As IOCallback, ByVal retry As Boolean, ByVal cbwait As Boolean, ByVal tag As Integer) As Integer
 ```
+The return value for all versions of `SendAsync` is: 0 if ok, -1 if the queue is full (for each device the maximum queue length is defined by the field `maxtasks`, default is 50), -2 if device is disposing.
+
 The standard version does not use a callback: it is a "fire-and-forget" version. In the complete version (probably rarely needed though) the callback function will be called to signal the status of the operation (however there will be no valid data in the `IOquery` variable passed to it). This version enables however the calling program to break the “retry” loop calling the “`AbortRetry`” method of the `IOQuery` variable.
 
 ##### QueryAsync with callback
@@ -360,6 +377,8 @@ Public Function QueryAsync(ByVal cmd As String, ByVal text As TextBox, ByVal ret
 
 Public Function QueryAsync(ByVal cmd As String, ByVal text As TextBox, ByVal retry As Boolean, ByVal tag As Integer) As Integer
 ```
+
+The return value for all versions of `QueryAsync` is: 0 if ok, -1 if the queue is full (for each device the maximum queue length is defined by the field `maxtasks`, default is 50), -2 if device is disposing.
 
 #### The class `IOQuery`  
 
@@ -438,7 +457,7 @@ Public Sub AbortRetry()
 
 ```
 
-#### Other methods of IODevice class
+#### Other methods and fields of IODevice class
 
 ##### Instance public methods:
 
@@ -495,7 +514,7 @@ Public Shared Function DeviceByName(ByVal name As String) As IODevice
 Public Shared Sub DisposeAll()
 ```
 
-##### Static public  fields :
+##### Instance public fields :
 
 C#
 ```C#
@@ -536,6 +555,7 @@ public bool catchcallbackexceptions;          //default=true
 public bool callbackonretry;         //default=true, if callback called on each retry when error
 ```
 
+The internal methods and properties to use in implementations are listed in the section "Writing Implementations".
 
 ### Devices list window
 
@@ -570,14 +590,63 @@ Following the object-oriented philosophy every device derives from `IODevice` wh
 
 The implementations of this abstract class given here provide a basic configuration (but succesfully tested with various devices). Again following the object-oriented philosophy, it is easier to write a derived class for each specific configuration than to make a class which would take into account all available options. For example, all GPIB classes use the standard "EOI" signal to detect the end of message. If your device cannot set EOI but instead uses a specific caracter to terminate messages (e.g."\\n") you can write a child class which redefines the constructor to set the device options accordingly (alternatively, it may also override the `ReceiveByteArray` method, see section about writing new implementations).
 
-All implementations configure the interface with a relatively short timeout (300ms for GPIB, few ms for serial) because anyway the reading will be repeated until the "cumulative" timeout period `readtimeout`  elapses, in this way the bus will not be blocked for a long time even if polling is disabled.  
-
-The constructor of each of these classes will throw an exception if the device initialization fails. This is to prevent creating ill-defined objects, catching constructor exceptions should be done outside the constructor.
-
-For all GPIB classes, if `buffersize` is not specified it will be set to 32k.
+The constructor of each implementation class will throw an exception if the device initialization fails. This is to prevent creating ill-defined objects, catching constructor exceptions should be done outside the constructor.
 
 
-Below is the list of the implementations provided here. 
+##### *enabling asynchronous Notify callbacks for GPIB and Visa:*
+
+The class IODevice defines a virtual boolean property EnableNotify (default=false) so that it can be implemented where needed and allowing writing a generic code. In the default base-class implementation trying to set this property to true will raise a NotSupportedException.  In the current version, the property is implemented (overridden) in the implementations GPIBDevice_NINET, GPIBDevice_ADLink and VisaDevice, in these classes setting this property to true will enable the board's "Notify" callback to be activated on SRQ and subscribe to the notify event for the device. Each callback on SRQ will then call the device's WakeUp() method as explained before.
+
+To enable setting SRQ when the MAV bit is set, you need to enable the appropriate bit in the Service Request Enable Register of your instrument. Usually, it is the bit 4 and it will be set sending the command "*SRE 16" to the device (note that you can also add other flags to wakeup on, eg. OPC, error, etc.). There is an example of function doing all these configuration steps in the test Form:
+
+```C#
+public void setnotify(IODevice dev)
+  {
+   try{  //use try-catch in case it is not implemented in the actual target class
+
+          dev.EnableNotify = true;                  //enable calling WakeUp on SRQ
+
+          if (dev.SendBlocking("*SRE 16",true)==0); //set bit 4 in the Service Request
+                                                    //Enable Register, so that the
+                                                    //MAV status will set SRQ
+          {
+
+          dev.delayread = 1000;
+          dev.delayrereadontimeout = 1000;          //set long wait delays :
+                                                    //will be interrupted anyway
+          }
+      }
+   catch (Exception ex)
+            {
+        MessageBox.Show( "cannot set EnableNotify for device " +
+                                 dev.devname + CrLf + ex.Message);
+      }
+  }
+```
+
+
+
+
+#####  *readtimeout field vs. interface timeout setting considerations:*
+
+The low-level drivers have a "timeout" parameter which defines the maximum amount of time the driver will wait for an operation to be completed, otherwise, it will abort it. For the "receive" operation this time includes both the waiting for the device to be ready and the time needed to transfer the data. If polling is used (`enablepoll`=true) then the "receive" operation is never called before the device is ready, therefore the timeout should only be greater then the data transfer time but the exact setting is not critical (the default value of 3s should be ok for most cases). However, for devices where polling is not available and is disabled, it may be necessary to tune the interface timeout so that the "receive" operation does not block the interface for a long time. When the interface timeout is signalled, the IODevice class will automatically repeat the reading (the definitive timeout condition is signalled only when the cumulative timeout delay `readtimeout` elapses, see query sequence) so that the interface timeout can be set relatively short (but long enough compared to the expected data transfer time to not to risk interrupting the transfer). For example, if we need to wait about 1s to read a short string (data transfer time below 100 microseconds), we can safely set, e.g., `delayread`=1000 and the interface timeout to 100-300ms.
+
+The method to set the interface timeout for GPIB/Visa is implementation dependent (via properties `NIDevice`, `IOTimeoutCode`, `IOTimeout`, depending on the subclass).
+There is no need for such property in the SerialDevice implementation because the interface timeout has a very different meaning here: for a serial port the "receive" operation does not really involve a data transfer (receiving is handled by the driver continuously in the background and a call to the driver function only invokes a memory copy from an internal input buffer). Therefore, the serial port driver timeout can be fixed to an arbitrarily short value without risk of data corruption.
+
+##### *checkEOI flag and buffersize:*
+
+For all GPIB classes, if the `buffersize` constructor parameter is not specified in the constructor, it will be set to 32k by default (the implementations also provide a property `Buffersize`).
+
+Buffersize determines the maximum amount of data (in bytes) that can be read in a single call to a library "receive" function.
+By default, GPIB uses the signal "EOI" set with the last transferred data byte to tell the receiver that all data has been read: if EOI is not set, it means that all data could not be transferred, most often because it could not fit within the provided buffer size, and that reading should be repeated to get the next part of it. If the field `checkEOI` is set to true (default), then each time EOI is not set after a read, the class will automatically repeat reading and append the data to the input buffer. Of course, reading in small chunks will incur a big performance penalty (the device has to be readdressed each time), so it is in general better to set the buffer to the maximum expected data length*. Maybe, in cases when a very big amount of data is to be read, one could prefer to limit the buffer size so as to split readings in several parts in order to free the bus in between, so to make it more often available for other devices.
+
+*apparently, it can also happen that a bugged device firmware exhibits an undefined behavior when the receiving buffer is too small.
+
+
+
+
+Below is the list of the implementations provided here (other implementations, mostly written by EEVblog members, can be found on Ian-Johnston's website/github). 
 
 #### class GPIBDevice_NINET
 
@@ -805,7 +874,7 @@ protected override int PollMAV(ref bool mav, ref byte statusbyte, ref int errcod
 
 int pollresult = base.PollMAV(ref mav, ref statusbyte, ref errcode, ref errmsg);
 
-if (pollresult == 0) { mav = (statusbyte & newmask)!=0;}//reinterpret received statusbyte with a different mask
+if (pollresult == 0) { mav = ...;}//reinterpret received statusbyte 
 
 return pollresult;
 
