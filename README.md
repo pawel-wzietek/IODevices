@@ -67,6 +67,12 @@ The test projects contain a reference to the assembly "_IODevices.dll_" therefo
 
 each containing both a library and a test project.
 
+##### Python bindings
+
+The notebook _iodevclr.ipynb_ in the 'Python' directory shows how to call the library functions from Python, using the _PythonNET_ package. For me it worked well under Jupyter however I had some problems to import the latest version (as of 2025) of PythonNET under Spyder.
+
+
+
 ### Derivative work and third party implementations
 
 I got quite a lot of feedback from people who have been succesfully using this code however I don't know how many of them have modified or extended it. One documented case is the app WinGPIB by Ian Johnston:
