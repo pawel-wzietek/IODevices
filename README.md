@@ -612,7 +612,7 @@ public void setnotify(IODevice dev)
 
           dev.EnableNotify = true;                  //enable calling WakeUp on SRQ
 
-          if (dev.SendBlocking("*SRE 16",true)==0) //set bit 5 in the Service Request
+          if (dev.SendBlocking("*SRE 16",true)==0) //set bit 4 in the Service Request
                                                     //Enable Register, so that the
                                                     //MAV status will set SRQ
           {
