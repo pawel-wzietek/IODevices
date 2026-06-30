@@ -650,13 +650,13 @@ By default, GPIB uses the signal "EOI" set with the last transferred data byte t
 *apparently, it can also happen that a bugged device firmware exhibits an undefined behavior when the receiving buffer is too small.
 
 
-
+### *Implementations*
 
 Below is the list of the implementations provided here (other implementations, mostly written by EEVblog members, can be found on Ian-Johnston's website/github). 
 
 #### class GPIBDevice_NINET
 
-uses the native .NET library for NI Gpib , uses as reference the following .NET assemblies from NI: `NationalInstrumentsCommon`, `NationalInstruments.NI4882` (these are installed with the NI GPIB driver). The class was intensively tested with the GPIB-USB-HS+ board from NI (running 24/7 for months). The assembly will not compile if these files are not found (and were not included here because of copyright), therefore a version of the project where this class is not included is also provided. Note that in many cases we won't necessary need this library: usually the NI software for GPIB will also install Visa. Also, in the 32bit environment the ADLink implementation is in principle compatible with the dll provided by NI (see later).
+This class uses the native .NET library for NI Gpib , uses as reference the following .NET assemblies from NI: `NationalInstrumentsCommon`, `NationalInstruments.NI4882` (these are installed with the NI GPIB driver). The class was intensively tested with the GPIB-USB-HS+ board from NI (running 24/7 for months). The assembly will not compile if these files are not found (and were not included here because of copyright), therefore a version of the project where this class is not included is also provided. Note that in many cases we won't necessary need this library: usually the NI software for GPIB will also install Visa. Also, in the 32bit environment the ADLink implementation is in principle compatible with the dll provided by NI (see later).
 
 class constructors:
 
@@ -684,11 +684,13 @@ addr is the GPIB address and can have the following forms:
 
 The class implements a boolean property `EnableNotify` (default=false).   Setting this property to true will enable the board's "Notify" callback to be activated on SRQ and subscribe to the notify event for the device (the class keeps a list of all devices for which `EnableNotify` was set).  Each callback on SRQ will then call the device's `WakeUp()` method as was already explained earlier.  
 
-The NI library provides two versions of the callback: at board level and at device level.  For the latter, as there is only a single SRQ line, the NI driver will automatically poll all selected devices to find the source of SRQ.
+The NI library provides two versions of the callback: at board level (only one callback function can be defined for a board,) and at device level (per-device callback functions).  For the latter, as there is only a single SRQ line, the NI driver will automatically poll all selected devices to find the source of SRQ. This is the standard use of SRQ as explained in the GPIB manuals. 
 
-This library uses only the board-level callback, since calling `Wakeup` will proceed to poll anyway (if polling is enabled, however note that you can use this feature even with polling disabled: then calling `Wakeup` will result in trying to read data immediately).   As only one callback function can be defined for a board, each SRQ request will call WakeUp methods of all devices having subscribed therefore if used for many devices on the same board it may become less efficient and even cause driver errors.  Typically, it should be used for selected devices for which it is essential to get data as soon as it is ready.  
+However, in early releases I noticed that the Notify feature was sometimes not working properly, depending on the hardware configuration.  I found since that the problems were precisely related to the driver's "automatic polling" feature which is activated by default and apparently tries to poll all devices whether or not they subscribed to device-level callbacks : if one device does not reacts correctly to a poll the driver gets stuck. In the current version the autopolling has been disabled (in the class constructor). 
 
-In early releases I noticed that the Notify feature was sometimes not working properly, depending on the hardware configuration.  I found since that the problems were related to the NI driver's "automatic polling" feature which is activated by default (and apparently tries to poll all devices whether or not they subscribed to device-level callbacks). In this version the autopolling has been disabled (in the class constructor).  
+Instead, the class only uses the board-level callback, which calls the `Wakeup` functions for all devices having subscribed. This is sufficient since calling `Wakeup` will proceed to poll anyway (NB. if polling is enabled, however note that you can use this feature even with polling disabled: then calling `Wakeup` will result in trying to read data immediately).   Each SRQ request will call WakeUp methods of all devices having subscribed but not the others, so that devices that cause trouble to SRQ can easily excluded from the procedure. Note that if SRQ is used for many devices on the same board it may become less efficient (and more prone to driver errors).  Typically, it should be used for selected devices for which it is essential to get data as soon as it is ready.  
+
+ 
 
 To enable setting SRQ when the MAV bit is set you need to enable the appropriate bit in the Service Request Enable Register of your instrument. Usually it is the bit 4 and it will be set sending the command "\*SRE 16" to the device (note that you can also add other flags to wakeup on, eg. OPC,  error etc.). There is an example of function doing all these configuration steps in the demo project:
 
@@ -709,7 +711,7 @@ public void setnotify(GPIBDevice_NINET dev)
 
 #### class GPIBDevice_gpib488
 
-uses the Windows dll library "_gpib488.dll_" provided with Measurement&Computing or Keithley boards and also some older NI boards. This dll is usually provided in both 32bit and 64bit versions (with the same name but in different Windows directories). The class has been tested with the KUSB-488A board from Keithley. I don't have a MCC board but the signatures of all the _gpib488.dll_ functions are exactly the same for both (let me know if there are problems). For older NI boards there is an equivalent library named "_NI4882.dll_" that I have tested too, it works in principle but seems a bit flaky with some devices, using Visa is apparently more reliable. The name of the dll is defined by the string constant `_GPIBDll` so it is easy to change it in the code. However, for NI I noticed that many provided GPIB examples for C/C++ programming use rather Visa interface instead of these older dlls so this is probably the way to go if you don't want to use the NINET interface.
+uses the Windows dll library "_gpib488.dll_" provided with Measurement&Computing or Keithley boards and also some older NI boards. This dll is usually provided in both 32bit and 64bit versions (with the same name but in different Windows directories). The class has been tested with the KUSB-488A board from Keithley. I don't have a MCC board but the signatures of all the _gpib488.dll_ functions are exactly the same for both (let me know if there are problems). For older NI boards there is an equivalent library named "_NI4882.dll_" that I have tested too, it works in principle but seems a bit flaky with some devices (using Visa is apparently more reliable here). The name of the dll is defined by the string constant `_GPIBDll` so it is easy to change it in the code. Note that for NI I noticed that many provided GPIB examples for C/C++ programming use rather Visa interface instead of these older dlls so this is probably the way to go if you don't want to use the NINET interface. 
 
 The constructor parameters are the same as for GPIBDevice_NINET.
 
@@ -734,7 +736,7 @@ The class adds a property `IOTimeoutCode` working like the one of GPIBDevice_gpi
 
 The class implements the property `EnableNotify`. It has been implemented in a way similar to GPIBDevice_NINET: only the board callback is used and autopolling is disabled, the class maintaining a list of subscribers to the Notify service (see description of GPIBDevice_NINET for more details).
 
-In the first version the class was using the driver calls provided in the ADLink library import module for C#. These are not all compatible with the "standard" calls found in other "gpib-32" dlls, however all standard routines exist there as can be found using a dll browser.  In the current version only standard calls are used.  Therefore this class should also be compatible with NI drivers  (so the class could rather be called "GPIBDevice\_gpib-32" but I did not want to change the name). (Note however that error messages are less complete here than those returned by GPIBDevice_NINET.) The code of this class is almost identical to the one of GPIBDevice_gpib488  except for some tiny differences in the driver functions signatures.  
+In the first version the class was using the driver calls provided in the ADLink library import module for C#. These are not all compatible with the "standard" calls found in other "gpib-32" dlls, however all standard routines exist there as can be found using a dll browser.  In the current version only standard calls are used.  Therefore this class is also compatible with NI drivers  (so the class could rather be called "GPIBDevice\_gpib-32" but I did not want to change the name). Note however that error messages are less complete here than those returned by GPIBDevice_NINET. The code of this class is almost identical to the one of GPIBDevice_gpib488  except for some tiny differences in the driver functions signatures.  
 
 Note for ADLink board users:
 
@@ -834,7 +836,10 @@ if "termstr" is defined in the constructor then it will take over the value set 
 
 There is no polling feature for serial port, therefore for this interface 1) the polling function sets the MAV status to true as soon as the input buffer is not empty; 2) then the serial port timeout is set to very short value (few ms) so that blocking commands do not freeze GUI when waiting for a line to be completed (here reading will almost always be repeated more than once).
 
-Like for the classes `GPIBDevice_NINET` and `VisaDevice`, the current version uses an asynchronous signalling, here the property controlling it is `EnableDataReceivedEvent` and is set to true by default in the class constructor.   When enabled it defines a handler for the SerialPort class' DataReceivedEvent, the handler calls `WakeUp()` to immediately interrupt any waiting delay.  Unlike GPIB, each serial port has its own handler so there is no problem of making lots of unnecessary polls.  With this feature the `SerialDevice` class will provide response as soon as it is completed, in both blocking and asynchronous queries.   In principle there is no reason to disable this default behavior - maybe except when you are expecting an extremely long response and want to avoid events to be fired every few incoming characters or so.  
+Like for the classes `GPIBDevice_NINET` and `VisaDevice`, the current version uses an asynchronous signalling, here the property controlling it is `EnableDataReceivedEvent` and is set to true by default in the class constructor.   When enabled it defines a handler for the SerialPort class' DataReceivedEvent, the handler calls `WakeUp()` to immediately interrupt any waiting delay.  Note that this event it is different from *Notify* in GPIB and Visa: the event is not to signal that the data is ready, it rather occurs whenever a new data packet arrives to the port (however, the .NET SerialPort class does not guarantee it will be called on each character therefore default delays are set short in case the end-of-line character is missed). Unlike GPIB where all devices share a single SRQ line, each serial port has its own handler, therefore it does not need to make lots of unnecessary polls to determine the source of the event.
+
+
+With this feature the `SerialDevice` class will provide response as soon as it is completed, in both blocking and asynchronous queries.   In principle there is no reason to disable this default behavior - maybe except when you are expecting an extremely long response and want to avoid events to be fired every few incoming characters or so.  
 
 Note that unlike protocols like GPIB, USBTMC or LXI which are defined to make things uniform, the serial port does not have any standard protocol for messages therefore it is not possible to make a plug-and-play class (like Visa) working for all serial connections.  The `SerialDevice` class implements a simple line-oriented protocol: each message terminates with the same special end-of-line character and there is one response message for each query. However if your device uses something different  -  such as either fixed length messages with no termination or some weird syntax where both terminated and fixed-length messages are mixed or where responses can use different termination characters depending on command - then it will be necessary to make a derived class overriding the method `ReadByteArray`.  In case this method needs to know what the command sent was to determine how to format the response, I have added a property `currentactivequery` which may be used to access this information.
 
@@ -908,9 +913,7 @@ Protected ReadOnly Property currentactivequery() As IOQuery
 
 ## Some technical details: query sequence and lock levels
 
-There are three lock levels: bus, device, queue.
-
-The query sequence is the same for blocking/async commands, the only difference is that 1) they are executed on different threads 2) for blocking commands executed on the main thread, processing application events is allowed in waiting loops to not to freeze the GUI (this may be disabled setting "eventsallowed" to false)
+The access to devices is protected via a two-level lock mechanism: bus (interface) lock and device lock.
 
 In order to prevent deadlocks, all locks are released at the time the user callback is invoked (therefore in principle there are no restrictions on what you can do inside a callback function).
 
@@ -923,9 +926,9 @@ protected int interfacelockid;
 This variable has to be set by the child class constructor and the allowed values of the index are 0..99. If `interfacelockid` is set to a negative value then no interface locking is performed.
 The idea here is that if we have two different interfaces that can be used concurently they can use different lock objects so that locking will not degrade performance.
 
-For gpib, if there is only one board, then interface locking will not slow down the system since all devices share the same bus anyway (and can bring the benefit of a more responsive GUI in blocking calls as explained above). However, if there are several boards accessed by the same driver then if the driver is thread-safe, it is better to allow different boards to be accessed simultaneously from different threads, this is achieved setting different interfacelockid values for each board. If a driver is not thread-safe, then we have to use the same interfacelockid for all boards/devices using this driver.
+For gpib, if there is only one board, then interface locking will not slow down the system since all devices share the same bus anyway (and can bring the benefit of a more responsive GUI in blocking calls as explained above). However, if there are several boards accessed by the same driver then if the driver is thread-safe, it is better to allow different boards to be accessed simultaneously from different threads, this is achieved setting different `interfacelockid` values for each board. If a driver is not thread-safe, then we have to use the same `interfacelockid` for all boards/devices using this driver.
 
-For USB and TCP/IP via Visa and for the serial port, the situation is a bit different since there is no common bus, here sharing the same lock for several devices may slow down the data transfer. Visa is thread-safe therefore it is safe to access the driver without locks. The SerialPort class instance members are not quite thread-safe but since in this code, we never have two threads talking to the same COM port at the same time the serial interface locking can be disabled too. One caveat though: it has been reported that some USB-serial converter dongles have buggy virtual com port drivers (https://lavag.org/topic/18562-visa-write-read-to-usb-instruments-in-parallel-crashes-labview/), if problems arise, it may be necessary to define a common `interfacelockid` value for all devices talking to the same virtual com port driver (NB. I have tested the SerialDevice class with several devices attached via a Prolific USB-serial converter, with interface locking disabled, so far I did not detect any problems).
+For USB and TCP/IP via Visa and for the serial port, the situation is a bit different since there is no common bus, here sharing the same lock for several devices may slow down the data transfer. Visa is thread-safe therefore it is safe to access the driver without locks. The .NET SerialPort class instance members are not quite thread-safe but in this code (SerialDevice) we never have two threads talking to the same COM port at the same time, so that the serial interface locking can be disabled too. One caveat though: it has been reported that some USB-serial converter dongles have buggy virtual com port drivers (https://lavag.org/topic/18562-visa-write-read-to-usb-instruments-in-parallel-crashes-labview/), if problems arise, it may be necessary to define a common `interfacelockid` value for all devices talking to the same virtual com port driver (NB. I have tested the SerialDevice class with several devices attached via a Prolific USB-serial converter, with interface locking disabled, so far I did not detect any problems).
 
 In this code, the default settings for `interfacelockid` follow this general philosophy:
 
@@ -945,7 +948,10 @@ Of course, these settings can be easy modified in the respective class construct
 
 
 #### Query Sequence
- 
+
+The query sequence is the same for blocking/async commands, the only difference is that 1) they are executed on different threads 2) for blocking commands executed on the main thread, processing application events is allowed in waiting loops to not to freeze the GUI (this may be disabled setting `eventsallowed` to false).
+
+Here it is:
 
 * lock device
 
@@ -957,9 +963,9 @@ Of course, these settings can be easy modified in the respective class construct
 
 * if send ok and response expected:
 
-    *   if polling enabled: poll status byte periodically until MAV bit is set, quit if timeout or abort (waiting between subsequent polling trials can be interrupted by any other thread calling WakeUp() )
+     *   if polling enabled: poll status byte periodically until MAV bit is set, quit if timeout or abort (waiting between subsequent polling trials can be interrupted by any other thread calling WakeUp() )
      *   try to read periodically (bus locked during each read) , quit if "readtimeout" elapsed or abort (waiting between subsequent reading trials can be interrupted by any other thread calling WakeUp() )
-*   if `checkEOI` set to true but EOI not present in the received data: repeat reading until EOI set, appending new data to receive buffer  
+     *   if `checkEOI` set to true but EOI not present in the received data: repeat reading until EOI set, appending new data to receive buffer  
 
 * if any gpib function returned error: clear device, if `showmessages` flag set then show message
 
@@ -969,7 +975,7 @@ Of course, these settings can be easy modified in the respective class construct
 
 *   if error and `retry` enabled: wait a delay `delayretry` (cannot be interrupted), then repeat the whole query process unless aborted by user
 
-Here the bus is locked during each I/O operation but not between write and read, however the device is locked during the whole query. Therefore when a thread is waiting for response from a device other async threads can send commands to their respective devices. Interleaving is obtained automatically.
+Here the interface is locked during each I/O operation but not between write and read, however the device is locked during the whole query. Therefore when a thread is waiting for response from a device other async threads can send commands to their respective devices. Interleaving is obtained automatically.
 
 Also, for the same reason interleaving is possible for blocking calls if `eventsallowed` field is set (default): this flag enables processing application events during delay and wait loops in blocking calls: if there are blocking calls in timers then timer events can be processed between write and read (this is disabled if `eventsallowed` is set to false, then however the GUI may freeze during blocking calls!).
 
