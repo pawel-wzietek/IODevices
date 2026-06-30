@@ -964,7 +964,7 @@ Here it is:
 * if send ok and response expected:
 
      *   if polling enabled: poll status byte periodically until MAV bit is set, quit if timeout or abort (waiting between subsequent polling trials can be interrupted by any other thread calling WakeUp() )
-     *   try to read periodically (bus locked during each read) , quit if "readtimeout" elapsed or abort (waiting between subsequent reading trials can be interrupted by any other thread calling WakeUp() )
+     *   try to read periodically (bus locked during each read) , quit if `readtimeout` elapsed or abort (waiting between subsequent reading trials can be interrupted by any other thread calling WakeUp() )
      *   if `checkEOI` set to true but EOI not present in the received data: repeat reading until EOI set, appending new data to receive buffer  
 
 * if any gpib function returned error: clear device, if `showmessages` flag set then show message
