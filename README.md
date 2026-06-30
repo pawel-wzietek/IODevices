@@ -172,7 +172,7 @@ quoted from: http://www.ni.com/tutorial/4054/en/ :
 >   
 > ANSI/IEEE Standard 488.2-1987 solves this problem by defining certain service request conditions so that one model describes the Status Byte for all compliant devices. Bit 6, the device Request Service (RQS) bit, maintains the IEEE 488.1 definition. If Bit 6 is set, then the device requested service. The IEEE 488.2 standard defines Bits 4 and 5; instrument manufacturers define the remaining bits (0 through 3 and 7). Bit 4 is the Message Available (MAV) bit. This bit is set if the device has been previously queried for data and the device has a pending data message to send.
 
-First note that this explanation is misleading.  Polling and SRQ are two distinct features that can be used together but don’t have to. 
+First note that this explanation is misleading.  Polling and SRQ are two distinct features that can be used together but don’t have to:
 
 > Serial polling is a method of obtaining specific information from GPIB devices when they request service.
  
@@ -274,7 +274,7 @@ public int QueryBlocking(string cmd, out IOQuery q, bool retry) 
 
 public int QueryBlocking(string cmd, out string resp, bool retry)
 
-public int QueryBlocking(string cmd, out byte\[\] resparr, bool retry)
+public int QueryBlocking(string cmd, out byte[] resparr, bool retry)
 ```
 VB
 
