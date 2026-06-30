@@ -180,7 +180,7 @@ Here polling is used to get the MAV bit whether SRQ is being used or not.
 
 > When you conduct a serial poll, the Controller queries each device looking for the one that asserted SRQ.
  
-This is only true if you use the “autopolling” configuration (default setting for GPIB boards).  The problem with autopolling is that when an older device that does not support the standard SRQ-poll protocol is on the bus the autopoller can stuck. Whenever possible I disabled autopolling and determine the source by my own way using board-level callbacks (see description of GPIBDevice_NINET and GPIBDevice_ADLink).  This was not possible in Visa therefore for some configurations handling SRQ may cause problems.    For more details on the use of SRQ see next section.
+This is only true if you use the “autopolling” configuration (default setting for GPIB boards).  The problem with autopolling is that when an older device that does not support the standard SRQ-poll protocol is on the bus the autopoller can get stuck. Whenever possible I disabled autopolling and determine the source by my own way using board-level callbacks (see description of GPIBDevice_NINET and GPIBDevice_ADLink).  This was not possible in Visa therefore for some configurations handling SRQ may cause problems.    For more details on the use of SRQ see next section.
 
 
 The polling option is enabled setting "enablepoll" field to true (default). It should be enabled if the device is compatible with the 488.2 standard. Then the serial poll is used to see if a device is ready to send data by examining its Status Byte, in this way the gpib bus is not locked most of the time when waiting for a device to respond. This is especially important when the query command also acts as a software trigger of a new measurement (standard behavior for DMMs).
@@ -682,32 +682,16 @@ addr is the GPIB address and can have the following forms:
 
 "GPIBb::n::INSTR"   (Visa format)  device n at board n° b   e.g.  "GPIB0::1::INSTR"
 
-The class implements a boolean property `EnableNotify` (default=false).   Setting this property to true will enable the board's "Notify" callback to be activated on SRQ and subscribe to the notify event for the device (the class keeps a list of all devices for which `EnableNotify` was set).  Each callback on SRQ will then call the device's `WakeUp()` method as was already explained earlier.  
+The class implements the virtual boolean property `EnableNotify` (default=false).   Setting this property to true will enable the board's *Notify* callback to be activated on SRQ and subscribe to the notify event for the device.  Each callback on SRQ will then call the device's `WakeUp()` method as was already explained earlier.  
 
-The NI library provides two versions of the callback: at board level (only one callback function can be defined for a board,) and at device level (per-device callback functions).  For the latter, as there is only a single SRQ line, the NI driver will automatically poll all selected devices to find the source of SRQ. This is the standard use of SRQ as explained in the GPIB manuals. 
+The NI library provides two versions of the callback: at board level (only one callback function can be defined for a board) and at device level (per-device callback functions).  For the latter, as there is only a single SRQ line, the NI driver will, by default, automatically poll the connected devices to find the source of SRQ. This is the standard use of SRQ as explained in the GPIB manuals. 
 
-However, in early releases I noticed that the Notify feature was sometimes not working properly, depending on the hardware configuration.  I found since that the problems were precisely related to the driver's "automatic polling" feature which is activated by default and apparently tries to poll all devices whether or not they subscribed to device-level callbacks : if one device does not reacts correctly to a poll the driver gets stuck. In the current version the autopolling has been disabled (in the class constructor). 
 
-Instead, the class only uses the board-level callback, which calls the `Wakeup` functions for all devices having subscribed. This is sufficient since calling `Wakeup` will proceed to poll anyway (NB. if polling is enabled, however note that you can use this feature even with polling disabled: then calling `Wakeup` will result in trying to read data immediately).   Each SRQ request will call WakeUp methods of all devices having subscribed but not the others, so that devices that cause trouble to SRQ can easily excluded from the procedure. Note that if SRQ is used for many devices on the same board it may become less efficient (and more prone to driver errors).  Typically, it should be used for selected devices for which it is essential to get data as soon as it is ready.  
+However, in early releases I noticed that the Notify feature was sometimes not working properly, depending on the hardware configuration. I found since that the problems were precisely related to the behavior of the NI driver's automatic polling feature (activated by default) which apparently tries to poll all devices present on the bus, whether or not they subscribed to device-level callbacks: if one device does not reacts correctly to a SRQ/poll the driver gets stuck. (BTW. the autopolling feature has to be used with caution, see e.g., http://www.ni.com/pdf/manuals/321819e.pdf, section 7.13). In this code, the autopolling has been disabled (in the static class constructor), in this way, Notify will work well even in configurations where SRQ-enabled instruments share the bus with devices which are not poll-aware and would be expected to impair the operation of the autopoller.
 
- 
 
-To enable setting SRQ when the MAV bit is set you need to enable the appropriate bit in the Service Request Enable Register of your instrument. Usually it is the bit 4 and it will be set sending the command "\*SRE 16" to the device (note that you can also add other flags to wakeup on, eg. OPC,  error etc.). There is an example of function doing all these configuration steps in the demo project:
+Instead, the class only uses the board-level callback and therefore does not need the autopolling to be enabled, this is because calling Wakeup will proceed to poll anyway (if polling is enabled, however note that you can use this feature even with polling disabled: then calling `Wakeup` will result in trying to read data immediately).  The class keeps a list of all devices for which EnableNotify was set, then each SRQ request will call WakeUp methods of all devices having subscribed but not the others, so that devices that cause trouble to SRQ can be easily excluded from the procedure. Note that if SRQ is used for many devices on the same board it may become less efficient (and more prone to driver errors).  Typically, it should be used for selected devices for which it is essential to get data as soon as it is ready.  
 
-```C#
-public void setnotify(GPIBDevice_NINET dev)
-
-  {
-
-          dev.delayread = 1000;
-          dev.delayrereadontimeout = 1000; //set long wait delays (will be interrupted anyway)
-
-          dev.SendBlocking("\*SRE 16", false); //set bit 4 in the Service Request Enable Register, so that the MAV status will set SRQ
-
-          dev.EnableNotify = true;  //enable calling WakeUp on SRQ
-
-  }
-```
 
 #### class GPIBDevice_gpib488
 
