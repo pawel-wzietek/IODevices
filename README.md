@@ -331,7 +331,7 @@ Public Function SendAsync(ByVal cmd As String, ByVal callback As IOCallback, ByV
 ```
 The return value for all versions of `SendAsync` is: 0 if ok, -1 if the queue is full (for each device the maximum queue length is defined by the field `maxtasks`, default is 50), -2 if device is disposing.
 
-The standard version does not use a callback: it is a "fire-and-forget" version. In the complete version (probably rarely needed though) the callback function will be called to signal the status of the operation (however there will be no valid data in the `IOquery` variable passed to it). This version enables however the calling program to break the “retry” loop calling the “`AbortRetry`” method of the `IOQuery` variable.
+The standard version does not use a callback: it is a "fire-and-forget" version. In the complete version (probably rarely needed though) the callback function will be called to signal the status of the operation (however there will be no valid data in the `IOquery` variable passed to it). This version enables however the calling program to break the “retry” loop calling the `AbortRetry` method of the `IOQuery` variable.
 
 ##### QueryAsync with callback
 
@@ -478,7 +478,7 @@ public int PendingTasks(string  cmd); //  same for a specific command: number 
 
 public void WaitAsync();  //this method can be used to synchronize blocking and async calls
 
-public void AbortAllTasks();    //as in the title: aborts all queries (blocking and async)
+public void AbortAllTasks();    //as in the title: aborts all queries (current blocking or async, and queued tasks)
 
 public void Dispose();
 ```
@@ -492,9 +492,7 @@ Public Function PendingTasks() As Integer
 Public Function PendingTasks(ByVal cmd As String) As Integer 
 
 Public Sub WaitAsync()           
-
-public void AbortAllTasks()   
-
+ 
 Public Sub AbortAllTasks()
 
 Public Sub Dispose()
@@ -576,6 +574,8 @@ By default `ShowDevices()`, will be called at startup (in the static constructo
 ![](IOmsgsnapshot1.jpg)
 
 When `showmessages` field is set to true (default) this forms opens when an error occurs. The form is not modal and is for information only: the program continues the same way whether the form is displayed or not. However it allows you to easily abort a "retry". When an error is corrected after a successful retry then the form will close itself. In the example above it signals that a device is not connected and that the query will be repeated, once it is connected the message will disappear. If you close the window and the error persists then the message will pupup again, minimize the window instead of closing it if you find it annoying. 
+
+Note that all the information displayed in this window is also contained in the `IOQuery` variable (except, obviously, for callback exceptions), it is therefore easy to implement your own messaging.
 
 
 ## IODevices assembly and implementations
