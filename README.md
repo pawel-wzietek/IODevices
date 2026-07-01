@@ -69,7 +69,7 @@ each containing both a library and a test project.
 
 ##### Python bindings
 
-The notebook _iodevclr.ipynb_ in the 'Python' directory shows how to call the library functions from Python, using the _PythonNET_ package. For me it worked well under Jupyter however I had some problems to import the latest version (as of 2025) of PythonNET under Spyder.
+The notebook _iodevclr.ipynb_ in the 'Python' directory shows how to call the library functions from Python, using the _PythonNET_ package. For me it worked well under Jupyter however I had some problems to import the latest version (as of 2025) of PythonNET under Spyder.  Apparently it is the line "clr.AddReference("System")" which causes the issue (this line is not absolutely necessary to use the library but it allows a better debugging capability through reflexion). The problem is solved disabling UMR, see https://github.com/spyder-ide/spyder/issues/21269.  
 
 
 
