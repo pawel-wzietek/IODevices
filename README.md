@@ -620,9 +620,10 @@ public void setnotify(IODevice dev)
 
           dev.EnableNotify = true;                  //enable calling WakeUp on SRQ
 
-          if (dev.SendBlocking("*SRE 16",true)==0) //set bit 4 in the Service Request
-                                                    //Enable Register, so that the
-                                                    //MAV status will set SRQ
+
+          if (dev.SendBlocking("*SRE 16",true)==0) // set bit 4 in Service Request Enable Register,
+                                                  // so that the MAV status will set SRQ
+																                                //(more generally, if not 488.2 compatible: send the MAVmask) 
           {
 
           dev.delayread = 1000;
@@ -638,7 +639,6 @@ public void setnotify(IODevice dev)
   }
 ```
 
-Note that the command "*SRE 16" is for standard 488.2 coding of the MAV bit, more generally you would send the value of the `MAVmask` field.
 
 
 
