@@ -74,6 +74,7 @@ Public Class Formtest
         Try
             dev.EnableNotify = True 'default implementation will throw an exception if not available for the selected interface
             Dim result As Integer = dev.SendBlocking("*SRE 16", False) ' set bit 4 in Service Request Enable Register, so that the MAV status will set SRQ
+                                                                        '(more generally, if not 488.2 compatible: send the MAVmask) 
             If result = 0 Then
                 dev.delayread = 1000 'set long wait delays (will be interrupted anyway)
                 dev.delayrereadontimeout = 1000
