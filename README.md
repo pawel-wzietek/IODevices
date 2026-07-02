@@ -476,6 +476,8 @@ public int PendingTasks();         //  return number of queries in the 
 
 public int PendingTasks(string  cmd); //  same for a specific command: number of copies of specific command in the queue
 
+public int PendingTasks(int tag)      // same for commands with a specific tag value
+
 public void WaitAsync();  //this method can be used to synchronize blocking and async calls
 
 public void AbortAllTasks();    //as in the title: aborts all queries (current blocking or async, and queued tasks)
@@ -489,7 +491,9 @@ Public Function IsBlocking() As Boolean
 
 Public Function PendingTasks() As Integer
 
-Public Function PendingTasks(ByVal cmd As String) As Integer 
+Public Function PendingTasks(ByVal cmd As String) As Integer
+
+Public Function PendingTasks(ByVal tag As Integer) As Integer
 
 Public Sub WaitAsync()           
  
@@ -526,7 +530,7 @@ public int maxtasks;  //max queue length (default=50)
 
 public string devname, devaddr;          //device name and address
 
-public static string statusmsg; //optional message (status etc.) to display in device list window
+public static string statusmsg;   //optional message (status etc.) to display in device list window
 
  // some delays to tweak performance (all in ms):
 
@@ -543,6 +547,10 @@ public int delayretry; //delay before retry on timeout
 public bool checkEOI;         //use EOI information: if true repeat read if EOI not detected (eg. buffer too small); default=true,
 
 public bool enablepoll; //use serial poll, set to false for devices not  supporting polling ("poll timeout" message)
+
+public byte MAVmask = 16;   // for GPIB, USBTMC-USB488, VXI-11:
+                           // standard (488.2) mask for MAV status (bit 5 of the status byte),
+                           // change it for devices not quite compliant with 488.2
 
 public bool stripcrlf;         //remove crlf in ByteArrayToString method
 
@@ -630,6 +638,7 @@ public void setnotify(IODevice dev)
   }
 ```
 
+Note that the command "*SRE 16" is for standard 488.2 coding of the MAV bit, more generally you would send the value of the `MAVmask` field.
 
 
 
@@ -862,14 +871,17 @@ Protected MustOverride Sub DisposeDevice()
 ```
 See explanations in the code of the class `IODevice`  under the comment "interface abstract methods that have to be defined" for the meaning of parameters and return values.
 
-Example: if your device does not comply with the 488.2 standard on the meaning of th status byte bits, you may need to re-interpret this byte to get the "message available" status, something like this:
+
+Example: If your device does not comply with the 488.2 standard on the meaning of the status byte bits, in the simplest case, you only need change the class' variable MAVmask (default=16 for the MAV status in bit n°4), if however, the status is coded in a more complicated way, then you may need to re-interpret this byte to get the "message available" status, something like this:
 
 ```C#
 protected override int PollMAV(ref bool mav, ref byte statusbyte, ref int errcode, ref string errmsg){
 
+// in the base class the mav status is obtained by bitwise AND between status byte and MAVmask
 int pollresult = base.PollMAV(ref mav, ref statusbyte, ref errcode, ref errmsg);
 
-if (pollresult == 0) { mav = ...;}//reinterpret received statusbyte 
+//but we can reinterpret the received statusbyte in a different way :
+if (pollresult == 0) { mav = ...;} 
 
 return pollresult;
 
