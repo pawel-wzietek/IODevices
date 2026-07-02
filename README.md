@@ -195,7 +195,7 @@ In a scheme based solely on polling the effective response time of a device has
 
 The IODevice class provides a very simple (optional) feature that can be used with asynchronous callbacks from the driver and which seamlessly integrates with the polling scheme described above:  the waiting for read after write or for next polling/reading trial can be asynchronously interrupted by another thread calling the device's method  `WakeUp`. Two delays are concerned: delay between write and read (`delayread`) and the delay between subsequent read/poll trials (`delayrereadontimeout`).  This method can be called from any thread and is intended to be used in a callback function called by a low-level driver (i.e. unsynchronized callbacks can be used).
 
- In the current project version this technique is implemented in three classes: the class `GPIBDevice_NINET` and `VisaDevice` offer an optional possibility to set up the GPIB "Notify" callback or its equivalent in other protocols supported by Visa,  and  the class `SerialDevice` uses it by default, implementing a handler of the DataReceived event of the SerialPort class (see class descriptions below for details).
+In the current project version, this technique is implemented in all classes except GPIBDevice_gpib488 where the driver does not provide support for it: the classes GPIBDevice_NINET, GPIBDevice_ADLink and VisaDevice offer an optional possibility to set up the GPIB "Notify" callback or its equivalent in other protocols supported by Visa, and the class SerialDevice uses it by default, implementing a handler of the DataReceived event of the SerialPort class. 
 
 Using the code : IODevice class reference
 -----------------------------------------
