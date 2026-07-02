@@ -105,7 +105,7 @@ namespace testIODevice
                 dev.EnableNotify = true;  //default implementation will throw an exception if not available for the selected interface
 
                 int result = dev.SendBlocking("*SRE 16", false);// set bit 4 in Service Request Enable Register, so that the MAV status will set SRQ
-
+																//(more generally, if not 488.2 compatible: send the MAVmask) 
                 if (result == 0)
                 {
                     dev.delayread = 1000;
