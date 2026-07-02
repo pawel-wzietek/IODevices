@@ -623,7 +623,7 @@ public void setnotify(IODevice dev)
 
           if (dev.SendBlocking("*SRE 16",true)==0) // set bit 4 in Service Request Enable Register,
                                                   // so that the MAV status will set SRQ
-																                                //(more generally, if not 488.2 compatible: send the MAVmask) 
+                                      //(more generally, if not 488.2 compatible: send the MAVmask) 
           {
 
           dev.delayread = 1000;
